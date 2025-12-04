@@ -5,3 +5,4 @@ if __name__ == "__main__":
     # Entry point
     game_instance = Game()
     game_instance.start()
+
