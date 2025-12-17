@@ -1,5 +1,3 @@
-# chess/rules.py
-
 class Rules:
     @staticmethod
     def get_valid_moves(board_obj, r, c):
@@ -85,11 +83,10 @@ class Rules:
                 if p and p.kind == 'K' and p.color == color:
                     king_pos = (r, c)
                     break
-        if not king_pos: return True # King ilang = kalah
+        if not king_pos: return True
 
         enemy_color = 'b' if color == 'w' else 'w'
         
-        # Cek apakah musuh bisa makan king
         for r in range(8):
             for c in range(8):
                 p = board_obj.get_piece(r, c)

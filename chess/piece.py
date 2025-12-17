@@ -2,15 +2,29 @@
 import random
 
 class Piece:
-    """Representasi bidak klasik"""
-    def __init__(self, kind, color, probability=1.0):
+    """Representasi bidak klasik (dan versi 'lite' untuk quantum split)."""
+    def __init__(self, kind, color, probability=1.0, qid=None):
         self.kind = kind    # 'K', 'Q', dst
         self.color = color  # 'w', 'b'
-        self.prob = probability
+        self.prob = float(probability)
+        self.qid = qid      # None -> klasik, int -> bagian dari superposisi
 
     @property
     def code(self):
         return f"{self.color}{self.kind}"
+
+    @property
+    def is_quantum(self):
+        return self.qid is not None and self.prob < 1.0
+
+    def clone(self, *, probability=None, qid=None):
+        """Clone bidak (hindari shared-reference saat split)."""
+        return Piece(
+            self.kind,
+            self.color,
+            self.prob if probability is None else float(probability),
+            self.qid if qid is None else qid,
+        )
 
 class QuantumPiece:
     """Menangani logika superposisi dan entanglement"""
@@ -21,33 +35,33 @@ class QuantumPiece:
         self.ent = [] # Entanglement list
  
     def measure(self):
-        """Melakukan pengukuran (Measurement/Collapse)"""
-        total_prob = sum([val[1] for val in self.qnum.values()])
-        if total_prob == 0: return None
-
-        rnd = random.uniform(0, total_prob)
-        cumulative = 0
+        """Collapse probabilitas ke satu state"""
+        total_prob = sum(state[1] for state in self.qnum.values())
+        rand = random.random() * total_prob
+        cum = 0.0
         chosen_state = None
-        
-        for state, data in self.qnum.items():
-            cumulative += data[1]
-            if rnd <= cumulative:
-                chosen_state = state
-                break
-        
-        if chosen_state:
-            final_pos = self.qnum[chosen_state][0]
-            # Reset state jd klasik di posisi baru
-            self.qnum.clear()
-            self.ent.clear()
-            self.qnum['0'] = [final_pos, 1.0]
-            return final_pos
-        return None
 
-    def entangle_oneblock(self, my_state, target_pos, other_piece, other_state):
-        """Logika entanglement"""
-        x = self.qnum[my_state][1]
-        y = other_piece.qnum[other_state][1]
+        for st_id, (p, prob) in self.qnum.items():
+            cum += prob
+            if rand <= cum:
+                chosen_state = st_id
+                break
+
+        # Collapse: set chosen state=1.0, others=0
+        final_pos = self.qnum[chosen_state][0]
+        for st_id in self.qnum:
+            self.qnum[st_id][1] = 1.0 if st_id == chosen_state else 0.0
+        return final_pos
+
+    def entangle_oneblock(self, other_piece, target_pos):
+        """Simple entanglement example: handle transitions, update ent list"""
+        # This method is for demonstration; can be expanded.
+        x = self.qnum['0'][1]
+        y = other_piece.qnum['0'][1]
+
+        # Example: split state into 2. Weighted by x,y
+        my_state = '0'
+        other_state = '0'
 
         a = x * y
         b = x * (1 - y)
