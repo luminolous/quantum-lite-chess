@@ -1,12 +1,14 @@
 # app/game.py
 import pygame
 import sys
+
 from .config import Config
 from .assets import AssetManager
-from chess.board import Board
-from chess.rules import Rules
+from qlc.board import Board
+from qlc.rules import Rules
 from render.renderer import Renderer
 from ai.bot import Bot
+
 
 class Game:
     def __init__(self):
@@ -21,21 +23,25 @@ class Game:
         self.board = Board()
         self.selected = None
         self.valid_moves = []
-        self.player_color = 'w' # Default
+        self.player_color = 'w'
         self.bot = None
         self.quantum_mode = False
 
-        self.split_target1 = None  # untuk split player (Shift+click)
+        self.split_target1 = None
         self.game_over = False
 
     def start(self):
-        # Simple choose side
         self._choose_side_menu()
 
-        # Main loop
+        # White always starts in chess → kalau player pilih black, bot (white) move dulu.
+        if self.player_color == "b":
+            self._bot_turn()
+
         clock = pygame.time.Clock()
+
         while True:
             clock.tick(30)
+
             self.renderer.draw_game(
                 self.board,
                 selected=self.selected,
@@ -49,23 +55,20 @@ class Game:
                     pygame.quit(); sys.exit()
 
                 if event.type == pygame.KEYDOWN:
-                    # Toggle quantum mode by pressing Q
                     if event.key == pygame.K_q:
                         self.quantum_mode = not self.quantum_mode
-                        self.board.move_log.append(f"Quantum Mode: {self.quantum_mode}")
-                        # cancel split state if toggled off
-                        if not self.quantum_mode:
-                            self.split_target1 = None
+                        self.split_target1 = None
+                        self.selected = None
+                        self.valid_moves = []
 
-                if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     self._handle_click(pygame.mouse.get_pos())
 
     def _choose_side_menu(self):
-        # Very simple menu: press W or B
         while True:
-            self.screen.fill((0,0,0))
-            text = self.assets.fonts['title'].render("Press W or B to choose side", True, (255,255,255))
-            self.screen.blit(text, (80, Config.HEIGHT//2 - 50))
+            self.screen.fill((0, 0, 0))
+            text = self.assets.fonts['title'].render("Press W or B to choose side", True, (255, 255, 255))
+            self.screen.blit(text, (80, Config.HEIGHT // 2 - 50))
             pygame.display.update()
 
             for event in pygame.event.get():
@@ -85,21 +88,23 @@ class Game:
         if self.game_over:
             return
 
-        x_off = (Config.WIDTH - Config.BOARD_SIZE)//2
-        y_off = (Config.HEIGHT - Config.BOARD_SIZE)//2
+        # python-chess enforce turn, jadi UI juga harus enforce
+        if getattr(self.board, "turn_color", None) != self.player_color:
+            return
+
+        x_off = (Config.WIDTH - Config.BOARD_SIZE) // 2
+        y_off = (Config.HEIGHT - Config.BOARD_SIZE) // 2
 
         mx, my = pos
-        col = (mx - x_off)//Config.SQUARE_SIZE
-        row = (my - y_off)//Config.SQUARE_SIZE
+        col = (mx - x_off) // Config.SQUARE_SIZE
+        row = (my - y_off) // Config.SQUARE_SIZE
 
-        # Convert to internal coords
         r = 7 - row if self.player_color == 'b' else row
         c = 7 - col if self.player_color == 'b' else col
-
         if not (0 <= r < 8 and 0 <= c < 8):
             return
 
-        # --- jika lagi mode split: pilih square ke-2 ---
+        # split: pick 2nd target
         if self.split_target1 is not None and self.selected is not None:
             if (
                 (r, c) in self.valid_moves
@@ -114,41 +119,50 @@ class Game:
                     self._bot_turn()
                 return
 
-            # klik square lain yang tidak valid -> cancel split (biar nggak nyangkut)
             if (r, c) != self.split_target1:
                 self.split_target1 = None
 
         piece = self.board.get_piece(r, c)
 
-        # --- move (atau mulai split) ---
-        if (r, c) in self.valid_moves and self.selected:
-            mods = pygame.key.get_mods()
+        # attempt move
+        if self.selected:
+            if (r, c) in self.valid_moves:
+                if self.quantum_mode and pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                    if self.board.get_piece(r, c) is None:
+                        self.split_target1 = (r, c)
+                    return
 
-            # Quantum split untuk player: tahan SHIFT, klik 1st destination (harus empty)
-            if self.quantum_mode and (mods & pygame.KMOD_SHIFT) and self.board.get_piece(r, c) is None:
-                self.split_target1 = (r, c)
-                self.board.move_log.append("Player: Split - choose 2nd square")
+                status = self.board.apply_move(self.selected, (r, c))
+                if status == "ok":
+                    self.selected = None
+                    self.valid_moves = []
+                    self.split_target1 = None
+                    self._bot_turn()
                 return
 
-            # Move/capture biasa (quantum capture bisa gagal)
-            self.board.apply_move(self.selected, (r, c))
             self.selected = None
             self.valid_moves = []
             self.split_target1 = None
-
-            self._bot_turn()
             return
 
-        # Select piece
+        # select piece
         if piece and piece.color == self.player_color:
             self.selected = (r, c)
             self.valid_moves = Rules.get_valid_moves(self.board, r, c)
             self.split_target1 = None
 
     def _bot_turn(self):
-        # Render 'Thinking' state
-        self.renderer.draw_game(self.board, thinking=True, player_color=self.player_color)
-        pygame.display.flip()
-        pygame.time.delay(500)
+        while not self.game_over and self.bot and getattr(self.board, "turn_color", None) != self.player_color:
+            self.renderer.draw_game(self.board, thinking=True, player_color=self.player_color)
+            pygame.display.flip()
+            pygame.time.delay(250)
 
-        self.bot.make_move(self.board)
+            self.bot.make_move(self.board)
+
+            if hasattr(self.board, "is_game_over") and self.board.is_game_over():
+                self.game_over = True
+                self.selected = None
+                self.valid_moves = []
+                self.split_target1 = None
+                if hasattr(self.board, "result"):
+                    self.board.move_log.append(f"GAME OVER: {self.board.result()}")

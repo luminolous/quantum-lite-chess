@@ -1,54 +1,57 @@
 # ai/bot.py
 import random
-from chess.rules import Rules
+import chess  # python-chess
+
+from qlc.rules import Rules
+from qlc.board import rc_to_square
+
 
 class Bot:
-    def __init__(self, color):
-        self.color = color
-        self.quantum_chance = 0.25
-        self.collapse_chance = 0.15
+    def __init__(self, color='b', seed=None):
+        self.color = color  # 'w' or 'b'
+        self.rng = random.Random(seed)
 
     def make_move(self, board_obj):
-        """Melakukan langkah AI (Classical atau Quantum-lite)."""
-        my_pieces = []
-        for r in range(8):
-            for c in range(8):
-                p = board_obj.get_piece(r, c)
-                if p and p.color == self.color:
-                    my_pieces.append((r, c))
-
-        random.shuffle(my_pieces)
-
-        for r, c in my_pieces:
-            p = board_obj.get_piece(r, c)
-            if not p:
-                continue
-
-            moves = Rules.get_valid_moves(board_obj, r, c)
-            if not moves:
-                continue
-
-            # Quantum split hanya kalau piece klasik (prob=1 & bukan quantum)
-            if p.qid is None and p.prob == 1.0 and random.random() < self.quantum_chance:
-                empty_sq = self._get_empty_squares(board_obj, (r, c))
-                if len(empty_sq) >= 2:
-                    s1, s2 = random.sample(empty_sq, 2)
-                    if board_obj.split_piece((r, c), s1, s2):
-                        board_obj.move_log.append("Bot: Split Move")
-                        return
-
-            # Normal move (capture quantum bisa gagal)
-            move = random.choice(moves)
-            status = board_obj.apply_move((r, c), move)
-            if status == "capture_failed":
-                # Turn tetap dianggap selesai (lite). Bisa kamu ubah kalau mau retry.
-                board_obj.move_log.append("Bot: Capture Failed")
+        if getattr(board_obj, "turn_color", None) != self.color:
+            return
+        if hasattr(board_obj, "is_game_over") and board_obj.is_game_over():
             return
 
-    def _get_empty_squares(self, board, exclude_pos):
-        res = []
+        candidates = []
+        want_color = chess.WHITE if self.color == "w" else chess.BLACK
+
         for r in range(8):
             for c in range(8):
-                if not board.get_piece(r, c) and (r, c) != exclude_pos:
-                    res.append((r, c))
-        return res
+                from_sq = rc_to_square(r, c)
+
+                ok = False
+                for br in getattr(board_obj, "branches", []):
+                    b = br.board
+                    p = b.piece_at(from_sq)
+                    if p and p.color == want_color and p.color == b.turn:
+                        ok = True
+                        break
+                if not ok:
+                    continue
+
+                valid = Rules.get_valid_moves(board_obj, r, c)
+                for (rr, cc) in valid:
+                    candidates.append(((r, c), (rr, cc)))
+
+        if not candidates:
+            return
+
+        # chance split
+        if self.rng.random() < 0.25:
+            by_start = {}
+            for s, e in candidates:
+                by_start.setdefault(s, []).append(e)
+            starts = [s for s, ds in by_start.items() if len(ds) >= 2]
+            if starts:
+                s = self.rng.choice(starts)
+                d1, d2 = self.rng.sample(by_start[s], 2)
+                if board_obj.split_piece(s, d1, d2):
+                    return
+
+        s, e = self.rng.choice(candidates)
+        board_obj.apply_move(s, e)
