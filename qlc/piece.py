@@ -29,7 +29,7 @@ class Piece:
 class QuantumPiece:
     """Menangani logika superposisi dan entanglement"""
     def __init__(self, pos, piece_obj):
-        self.piece_data = piece_obj.code # Simpan kode misal 'wP'
+        self.piece_data = piece_obj.code # Simpan kode bidak misal 'wP'
         # states: key=state_id, value=[pos, probability]
         self.qnum = {'0': [pos, 1.0]} 
         self.ent = [] # Entanglement list
@@ -54,12 +54,12 @@ class QuantumPiece:
         return final_pos
 
     def entangle_oneblock(self, other_piece, target_pos):
-        """Simple entanglement example: handle transitions, update ent list"""
-        # This method is for demonstration; can be expanded.
+        """Entanglement: handle transitions, update ent list"""
+
         x = self.qnum['0'][1]
         y = other_piece.qnum['0'][1]
 
-        # Example: split state into 2. Weighted by x,y
+        # Misal, split state jadi 2 (x,y)
         my_state = '0'
         other_state = '0'
 

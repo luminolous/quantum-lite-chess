@@ -42,10 +42,6 @@ class QuantumBoard:
         self.branches: List[Branch] = [Branch(b, 1.0 + 0.0j)]
         self._normalize()
 
-    # ---------------------------
-    # Helpers: probability & merge
-    # ---------------------------
-
     @staticmethod
     def _prob(amp: complex) -> float:
         return (amp.real * amp.real) + (amp.imag * amp.imag)
@@ -53,7 +49,7 @@ class QuantumBoard:
     def _normalize(self) -> None:
         total = sum(self._prob(br.amp) for br in self.branches)
         if total <= 0:
-            # fallback (should never happen unless all amps zeroed)
+            # fallback (klo semua amp 0)
             self.branches = [Branch(chess.Board(), 1.0 + 0.0j)]
             return
         scale = 1.0 / math.sqrt(total)
@@ -61,7 +57,6 @@ class QuantumBoard:
             br.amp *= scale
 
     def _merge_identical(self) -> None:
-        # Merge by full FEN (includes turn/castling/ep/counters) for consistency.
         buckets: Dict[str, complex] = defaultdict(complex)
         keep_board: Dict[str, chess.Board] = {}
 
@@ -91,15 +86,12 @@ class QuantumBoard:
         self._prune()
         self._merge_identical()
 
-    # ---------------------------
-    # API for UI / rendering
-    # ---------------------------
-
+    # API buat UI / rendering
     def most_likely_board(self) -> chess.Board:
         return max(self.branches, key=lambda br: self._prob(br.amp)).board
 
     def turn(self) -> bool:
-        # Use turn from the most likely branch (simple UI choice).
+        # Pake cabang paling mungkin buat turn
         return self.most_likely_board().turn
 
     def square_distribution(self, square: int) -> Dict[Optional[str], float]:
@@ -125,14 +117,11 @@ class QuantumBoard:
         moves: Dict[str, float] = defaultdict(float)
         for br in self.branches:
             p = self._prob(br.amp)
-            for mv in br.board.legal_moves:  # dynamic generator of legal moves :contentReference[oaicite:4]{index=4}
+            for mv in br.board.legal_moves:
                 moves[mv.uci()] += p
         return dict(moves)
 
-    # ---------------------------
-    # Coordinate helpers (optional)
-    # ---------------------------
-
+    # Coordinate helpers
     @staticmethod
     def rc_to_square(row: int, col: int) -> int:
         """
@@ -150,19 +139,14 @@ class QuantumBoard:
         col = file
         return row, col
 
-    # ---------------------------
-    # Core quantum operations
-    # ---------------------------
-
+    # Quantum operations
     def _copy_board(self, b: chess.Board) -> chess.Board:
-        # copy(stack=False) avoids copying the whole move stack :contentReference[oaicite:5]{index=5}
         return b.copy(stack=False)
 
     def _push_or_null(self, b: chess.Board, mv: Optional[chess.Move]) -> None:
         if mv is None:
             b.push(chess.Move.null())
             return
-        # push() does NOT check legality; ensure mv is legal or null move :contentReference[oaicite:6]{index=6}
         b.push(mv)
 
     def _collapse_to(self, keep_mask: List[bool]) -> None:
@@ -193,10 +177,7 @@ class QuantumBoard:
             self._collapse_to(mask_b)
             return "B"
 
-    # ---------------------------
     # Classical move with quantum effects
-    # ---------------------------
-
     def apply_move(
         self,
         from_sq: int,
@@ -214,7 +195,7 @@ class QuantumBoard:
             - Otherwise: controlled move => legal branches push(move), illegal branches push(null).
         - If capture is possible in some branches but not others => measurement on "capture happened" vs "not".
         """
-        # Per-branch move resolution
+        # Per branch move resolution
         legal_mv: List[Optional[chess.Move]] = [None] * len(self.branches)
         illegal_own: List[bool] = [False] * len(self.branches)
         capture_possible: List[bool] = [False] * len(self.branches)
@@ -222,32 +203,29 @@ class QuantumBoard:
         for i, br in enumerate(self.branches):
             b = br.board
 
-            # Exclusion check: if own piece on target in THIS branch, moving there is "occupied-by-own" scenario
             tgt = b.piece_at(to_sq)
             if tgt is not None and tgt.color == b.turn:
                 illegal_own[i] = True
                 continue
 
             try:
-                mv = b.find_move(from_sq, to_sq, promotion=promotion)  # :contentReference[oaicite:8]{index=8}
+                mv = b.find_move(from_sq, to_sq, promotion=promotion) 
             except Exception:
                 mv = None
 
             legal_mv[i] = mv
             if mv is not None:
-                # python-chess can tell capture in a position; used for measurement rule
                 try:
                     capture_possible[i] = b.is_capture(mv)
                 except Exception:
                     capture_possible[i] = False
 
-        # 1) Exclusion measurement if needed: occupied-by-own vs not-occupied-by-own
+        # Exclusion measurement: occupied by own vs not
         if any(illegal_own):
             mask_occ = illegal_own
             mask_free = [not x for x in illegal_own]
             outcome = self._measure_two_outcomes(mask_occ, mask_free)
             if outcome == "A":
-                # occupied-by-own => move becomes a "fail": null move in all remaining branches
                 new_branches: List[Branch] = []
                 for br in self.branches:
                     nb = self._copy_board(br.board)
@@ -256,12 +234,11 @@ class QuantumBoard:
                 self.branches = new_branches
                 self._post_step_cleanup()
                 return True
-            # else outcome "B": proceed with remaining branches (where not occupied)
 
             # Recompute arrays after collapse
             return self.apply_move(from_sq, to_sq, promotion=promotion)
 
-        # 2) Capture measurement if capture happens in some branches but not others
+        # Capture measurement if capture happens in some branches but not others
         if any(capture_possible) and not all(capture_possible):
             mask_cap = capture_possible
             mask_nocap = [not x for x in capture_possible]
@@ -269,21 +246,18 @@ class QuantumBoard:
             # after collapse, recompute to execute consistently
             return self.apply_move(from_sq, to_sq, promotion=promotion)
 
-        # 3) Controlled move: legal branches do mv, illegal branches do null
+        # Controlled move: legal branches do mv, illegal branches do null
         new_branches = []
         for br, mv in zip(self.branches, legal_mv):
             nb = self._copy_board(br.board)
-            self._push_or_null(nb, mv)  # mv None => null move :contentReference[oaicite:9]{index=9}
+            self._push_or_null(nb, mv) 
             new_branches.append(Branch(nb, br.amp))
 
         self.branches = new_branches
         self._post_step_cleanup()
         return True
 
-    # ---------------------------
     # Split move (superposition of two moves)
-    # ---------------------------
-
     def apply_split(
         self,
         from_sq: int,
@@ -305,7 +279,7 @@ class QuantumBoard:
 
         for br in self.branches:
             b = br.board
-            # If own piece occupies either target, treat as split-not-possible (null)
+            # If own piece occupies either target, treat as impossible split (null)
             for t in (to_sq_a, to_sq_b):
                 tgt = b.piece_at(t)
                 if tgt is not None and tgt.color == b.turn:
@@ -316,11 +290,11 @@ class QuantumBoard:
             else:
                 # Try find legal moves
                 try:
-                    mv_a = b.find_move(from_sq, to_sq_a, promotion=promotion)  # :contentReference[oaicite:11]{index=11}
+                    mv_a = b.find_move(from_sq, to_sq_a, promotion=promotion) 
                 except Exception:
                     mv_a = None
                 try:
-                    mv_b = b.find_move(from_sq, to_sq_b, promotion=promotion)  # :contentReference[oaicite:12]{index=12}
+                    mv_b = b.find_move(from_sq, to_sq_b, promotion=promotion) 
                 except Exception:
                     mv_b = None
 

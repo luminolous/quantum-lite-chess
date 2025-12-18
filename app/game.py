@@ -39,7 +39,6 @@ class UIPiece:
 class QuantumBoardAdapter:
     """
     Membuat QuantumBoard "terlihat" seperti Board lama.
-    Minimal change di game.py + renderer + bot.
     """
     def __init__(self, *, seed: int = 123, max_branches: int = 64):
         self.qb = QuantumBoard(seed=seed, max_branches=max_branches)
@@ -47,12 +46,11 @@ class QuantumBoardAdapter:
 
     @property
     def turn_color(self) -> str:
-        # chess.WHITE == True, chess.BLACK == False :contentReference[oaicite:0]{index=0}
         return "w" if self.qb.turn() == chess.WHITE else "b"
 
     @property
     def branches(self):
-        # supaya kalau ada code lain yg iterasi branch
+        # biar kalo ada kode lain yg iterasi branch
         return self.qb.branches
 
     def get_piece(self, r: int, c: int):
@@ -74,14 +72,14 @@ class QuantumBoardAdapter:
     def get_valid_moves(self, r: int, c: int):
         """
         Union legal-moves dari semua branch untuk piece di (r,c).
-        python-chess punya board.legal_moves sebagai generator move legal. :contentReference[oaicite:1]{index=1}
+        python-chess punya board.legal_moves sebagai generator move legal
         """
         from_sq = QuantumBoard.rc_to_square(r, c)
         out = set()
 
         for br in self.qb.branches:
             b = br.board
-            p = b.piece_at(from_sq)  # piece_at() :contentReference[oaicite:2]{index=2}
+            p = b.piece_at(from_sq)  # piece_at()
             if p is None or p.color != b.turn:
                 continue
 
@@ -113,11 +111,40 @@ class QuantumBoardAdapter:
         return ok
 
     def is_game_over(self):
-        # gunakan branch paling mungkin untuk status game over
-        return self.qb.most_likely_board().is_game_over()  # :contentReference[oaicite:3]{index=3}
 
+        white_king_prob = self._get_king_probability(chess.WHITE)
+        black_king_prob = self._get_king_probability(chess.BLACK)
+
+        if white_king_prob <= 0 or black_king_prob <= 0:
+            return True
+
+        return self.qb.most_likely_board().is_game_over()
+    
     def result(self):
-        return self.qb.most_likely_board().result()  # :contentReference[oaicite:4]{index=4}
+
+        white_king_prob = self._get_king_probability(chess.WHITE)
+        black_king_prob = self._get_king_probability(chess.BLACK)
+
+        if white_king_prob <= 0 and black_king_prob > 0:
+            return "0-1" # Black wins (Raja putih tewas)
+        if black_king_prob <= 0 and white_king_prob > 0:
+            return "1-0" # Putih enang (Raja hitam tewas)
+        if white_king_prob <= 0 and black_king_prob <= 0:
+            return "1/2-1/2" # Draw (Keduanya tewas)
+
+        # Fallback ke hasil standar python-chess
+        return self.qb.most_likely_board().result()
+    
+    def _get_king_probability(self, color):
+        """Helper untuk menghitung total probabilitas Raja warna tertentu."""
+        total_prob = 0.0
+        for br in self.qb.branches:
+            # Hitung probabilitas branch
+            p = (br.amp.real ** 2) + (br.amp.imag ** 2)
+            # Cek apakah king ada di branch ini
+            if br.board.king(color) is not None:
+                total_prob += p
+        return total_prob
 
 class Game:
     def __init__(self):
@@ -142,7 +169,7 @@ class Game:
     def start(self):
         self._choose_side_menu()
 
-        # White always starts in chess → kalau player pilih black, bot (white) move dulu.
+        # White always first. kalo player pilih black, bot (white) move dulu.
         if self.player_color == "b":
             self._bot_turn()
 
@@ -151,32 +178,50 @@ class Game:
         while True:
             clock.tick(30)
 
+            current_result = None
+            if hasattr(self.board, "result"):
+                current_result = self.board.result()
+
             self.renderer.draw_game(
                 self.board,
                 selected=self.selected,
                 valid_moves=self.valid_moves,
                 quantum_mode=self.quantum_mode,
                 split_target1=self.split_target1,
-                player_color=self.player_color
+                player_color=self.player_color,
+                game_over=self.game_over, 
+                result_str=current_result
             )
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit(); sys.exit()
-
+                
+                # Esc untuk keluar saat game over
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_q:
-                        self.quantum_mode = not self.quantum_mode
-                        self.split_target1 = None
-                        self.selected = None
-                        self.valid_moves = []
+                    if event.key == pygame.K_ESCAPE:
+                        pygame.quit(); sys.exit()
+
+                    if not self.game_over: # Kunci input lain kalo udah game over
+                        if event.key == pygame.K_q:
+                            self.quantum_mode = not self.quantum_mode
+                            self.split_target1 = None
+                            self.selected = None
+                            self.valid_moves = []
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    self._handle_click(pygame.mouse.get_pos())
+                    # Cegah klik kalau udah game over
+                    if not self.game_over:
+                        self._handle_click(pygame.mouse.get_pos())
 
     def _choose_side_menu(self):
         while True:
-            self.screen.fill((0, 0, 0))
+            # self.screen.fill((0, 0, 0))
+            self.screen.blit(self.assets.background, (0, 0))
+            overlay = pygame.Surface((Config.WIDTH, Config.HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 100)) # Hitam transparan
+            self.screen.blit(overlay, (0, 0))
+
             text = self.assets.fonts['title'].render("Press W or B to choose side", True, (255, 255, 255))
             self.screen.blit(text, (80, Config.HEIGHT // 2 - 50))
             pygame.display.update()
@@ -198,7 +243,7 @@ class Game:
         if self.game_over:
             return
 
-        # python-chess enforce turn, jadi UI juga harus enforce
+        # python-chess enforce turn
         if getattr(self.board, "turn_color", None) != self.player_color:
             return
 
@@ -214,7 +259,7 @@ class Game:
         if not (0 <= r < 8 and 0 <= c < 8):
             return
 
-        # split: pick 2nd target
+        # Split logic
         if self.split_target1 is not None and self.selected is not None:
             if (
                 (r, c) in self.valid_moves
@@ -223,10 +268,7 @@ class Game:
             ):
                 ok = self.board.split_piece(self.selected, self.split_target1, (r, c))
                 if ok:
-                    self.selected = None
-                    self.valid_moves = []
-                    self.split_target1 = None
-                    self._bot_turn()
+                    self._end_player_turn() # Refactor ke method baru
                 return
 
             if (r, c) != self.split_target1:
@@ -234,7 +276,7 @@ class Game:
 
         piece = self.board.get_piece(r, c)
 
-        # attempt move
+        # Move logic
         if self.selected:
             if (r, c) in self.valid_moves:
                 if self.quantum_mode and pygame.key.get_mods() & pygame.KMOD_SHIFT:
@@ -244,10 +286,7 @@ class Game:
 
                 status = self.board.apply_move(self.selected, (r, c))
                 if status == "ok":
-                    self.selected = None
-                    self.valid_moves = []
-                    self.split_target1 = None
-                    self._bot_turn()
+                    self._end_player_turn()
                 return
 
             self.selected = None
@@ -255,13 +294,41 @@ class Game:
             self.split_target1 = None
             return
 
-        # select piece
+        # Select piece
         if piece and piece.color == self.player_color:
             self.selected = (r, c)
             self.valid_moves = self.board.get_valid_moves(r, c)
             self.split_target1 = None
 
+    def _end_player_turn(self):
+        """Dipanggil setelah player sukses melangkah."""
+        self.selected = None
+        self.valid_moves = []
+        self.split_target1 = None
+        
+        # Cek game over setelah player gerak
+        if self._check_game_over_condition():
+            return 
+
+        # Klo belum:
+        self._bot_turn()
+
+    def _check_game_over_condition(self):
+        """Cek status board dan update flag game_over."""
+        if hasattr(self.board, "is_game_over") and self.board.is_game_over():
+            self.game_over = True
+            self.selected = None
+            self.valid_moves = []
+            self.split_target1 = None
+            if hasattr(self.board, "result"):
+                res = self.board.result()
+                print(f"GAME OVER DETECTED: {res}")
+                self.board.move_log.append(f"GAME OVER: {res}")
+            return True
+        return False
+
     def _bot_turn(self):
+        # Loop bot turn
         while not self.game_over and self.bot and getattr(self.board, "turn_color", None) != self.player_color:
             self.renderer.draw_game(
                 self.board,
@@ -274,14 +341,10 @@ class Game:
             )
              
             pygame.display.flip()
-            pygame.time.delay(250)
+            # pygame.time.delay(250) # Kurangi delay biar gak terasa lag
 
             self.bot.make_move(self.board)
 
-            if hasattr(self.board, "is_game_over") and self.board.is_game_over():
-                self.game_over = True
-                self.selected = None
-                self.valid_moves = []
-                self.split_target1 = None
-                if hasattr(self.board, "result"):
-                    self.board.move_log.append(f"GAME OVER: {self.board.result()}")
+            # Cek game over setelah bot gerak
+            if self._check_game_over_condition():
+                break

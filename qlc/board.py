@@ -13,7 +13,7 @@ import random
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Dict
 
-import chess  # pip install python-chess
+import chess  # python-chess
 
 from .piece import Piece
 

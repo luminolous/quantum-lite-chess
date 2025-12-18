@@ -29,7 +29,7 @@ class AssetManager:
         self.fonts['split'] = pygame.font.SysFont(Config.FONT_MAIN, 18, bold=True)
 
     def _load_images(self):
-        # Load background
+        # Load bg
         bg_path = os.path.join(Config.ASSETS_PATH, "bg.jpg")
         if os.path.exists(bg_path):
             img = pygame.image.load(bg_path)
@@ -39,10 +39,10 @@ class AssetManager:
             self.background = pygame.Surface((Config.WIDTH, Config.HEIGHT))
             self.background.fill((50, 50, 50))
 
-        # Load board SVG
+        # Load board svg
         self.board_image = self._load_svg(Config.BOARD_IMAGE_PATH, (Config.BOARD_SIZE, Config.BOARD_SIZE))
 
-        # Load pieces SVG
+        # Load pieces svg
         piece_name_map = {"K": "king", "Q": "queen", "R": "rook", "B": "bishop", "N": "knight", "P": "pawn"}
         for color in ("w", "b"):
             for p_char, p_name in piece_name_map.items():

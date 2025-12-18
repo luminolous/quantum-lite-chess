@@ -16,11 +16,13 @@ class Renderer:
         split_target1=None,
         player_color="w",
         thinking=False,
+        game_over=False,
+        result_str=None,
     ):
         if valid_moves is None:
             valid_moves = []
 
-        # Background & board (pakai background asset yang sudah kamu load)
+        # Background & board
         self.screen.blit(self.assets.background, (0, 0))
 
         x_off = (Config.WIDTH - Config.BOARD_SIZE) // 2
@@ -35,7 +37,7 @@ class Renderer:
         # Highlight split target A (split_target1)
         if split_target1 is not None:
             r, c = split_target1
-            # Outline + soft fill biar kelihatan jelas
+            # Outline + soft fill
             self._draw_rect(r, c, Config.COLOR_SPLIT_ANCHOR, alpha=60, player_color=player_color)
             self._draw_rect(r, c, Config.COLOR_SPLIT_ANCHOR, width=6, player_color=player_color)
             self._draw_square_label(r, c, "A", player_color=player_color)
@@ -57,7 +59,7 @@ class Renderer:
             thinking=thinking,
         )
 
-        # Move log (kalau ada)
+        # Move log
         if hasattr(board_obj, "move_log"):
             self._draw_move_log(board_obj.move_log)
 
@@ -67,7 +69,47 @@ class Renderer:
             txt = font.render("Computer thinking...", True, (255, 255, 0))
             self.screen.blit(txt, (Config.WIDTH - 250, 20))
 
+        if game_over and result_str:
+            self._draw_game_over(result_str)
+
         pygame.display.update()
+
+    def _draw_game_over(self, result_str):
+        """Menggambar overlay hitam transparan dengan teks kemenangan."""
+        # Dark overlay
+        overlay = pygame.Surface((Config.WIDTH, Config.HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        self.screen.blit(overlay, (0, 0))
+
+        # Tentukan teks
+        title_font = self.assets.fonts.get("title") or self.assets.fonts["default"]
+        sub_font = self.assets.fonts.get("default")
+        
+        msg = "GAME OVER"
+        sub_msg = ""
+        
+        if result_str == "1-0":
+            sub_msg = "WHITE WINS!"
+            color = (100, 255, 100) # ijo
+        elif result_str == "0-1":
+            sub_msg = "BLACK WINS!"
+            color = (255, 100, 100) # merah
+        else:
+            sub_msg = "DRAW / STALEMATE"
+            color = (200, 200, 200) # abu
+
+        # Render teks di tengah layar
+        title_surf = title_font.render(msg, True, (255, 255, 255))
+        sub_surf = title_font.render(sub_msg, True, color)
+        
+        cx, cy = Config.WIDTH // 2, Config.HEIGHT // 2
+        
+        self.screen.blit(title_surf, (cx - title_surf.get_width() // 2, cy - 80))
+        self.screen.blit(sub_surf, (cx - sub_surf.get_width() // 2, cy - 20))
+        
+        # Instruksi keluar
+        hint = sub_font.render("Press ESC to Quit", True, (150, 150, 150))
+        self.screen.blit(hint, (cx - hint.get_width() // 2, cy + 60))
 
     def _draw_hud(self, board_obj, *, quantum_mode: bool, selected, split_target1, player_color: str, thinking: bool):
         """Panel instruksi kecil biar user paham kontrol split."""
@@ -114,7 +156,7 @@ class Renderer:
         w += pad * 2
         h += pad * 2
 
-        # Panel background transparan (alpha blending pakai Surface SRCALPHA) :contentReference[oaicite:0]{index=0}
+        # Panel bg transparan
         panel = pygame.Surface((w, h), pygame.SRCALPHA)
         panel.fill((0, 0, 0, 170))
         self.screen.blit(panel, (20, 20))
@@ -125,7 +167,7 @@ class Renderer:
             y += surf.get_height() + 4
 
     def _draw_square_label(self, r, c, text: str, player_color="w"):
-        """Label kecil di atas kotak (misalnya 'A' untuk split_target1)."""
+        """Label kecil di atas kotak (misal 'A' untuk split_target1)."""
         font = self.assets.fonts.get("split") or self.assets.fonts.get("small") or self.assets.fonts["default"]
 
         x_off = (Config.WIDTH - Config.BOARD_SIZE) // 2
@@ -161,7 +203,7 @@ class Renderer:
                 if img:
                     self.screen.blit(img, (x, y))
 
-                # Tampilkan probabilitas kalau quantum-lite
+                # Tampilkan probabilitas kalo quantum
                 prob = getattr(p, "prob", 1.0)
                 if prob < 1.0:
                     prob_txt = font.render(f"{int(prob * 100)}%", True, (255, 255, 255))
@@ -171,7 +213,7 @@ class Renderer:
         x_off = (Config.WIDTH - Config.BOARD_SIZE) // 2
         y_off = (Config.HEIGHT - Config.BOARD_SIZE) // 2
 
-        # Flip view buat black (samakan dengan piece rendering)
+        # Flip view buat black (samain dengan piece rendering)
         draw_r = 7 - r if player_color == "b" else r
         draw_c = 7 - c if player_color == "b" else c
 
