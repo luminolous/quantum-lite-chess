@@ -207,7 +207,8 @@ class Renderer:
                 # Tampilkan probabilitas kalo quantum
                 prob = getattr(p, "prob", 1.0)
                 if prob < 1.0:
-                    prob_txt = font.render(f"{int(prob * 100)}%", True, (255, 255, 255))
+                    # prob_txt = font.render(f"{int(prob * 100)}%", True, (255, 255, 255))
+                    prob_txt = self.assets.fonts['split'].render("50%", True, Config.COLOR_QUANTUM_TEXT)
                     self.screen.blit(prob_txt, (x + 5, y + 5))
 
     def _draw_rect(self, r, c, color, alpha=255, width=0, player_color="w"):

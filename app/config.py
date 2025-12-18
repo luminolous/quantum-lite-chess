@@ -23,6 +23,7 @@ class Config:
     
     # Quantum UI: kotak target A (split_target1)
     COLOR_SPLIT_ANCHOR = (0, 200, 255)
+    COLOR_QUANTUM_TEXT = (0, 220, 255)
     
     # Fonts
     FONT_MAIN = "DejaVu Sans"

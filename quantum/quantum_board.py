@@ -125,7 +125,7 @@ class QuantumBoard:
     @staticmethod
     def rc_to_square(row: int, col: int) -> int:
         """
-        If your UI uses row=0 at TOP (rank 8) and col=0 at LEFT (file a).
+        If UI uses row=0 at TOP (rank 8) and col=0 at LEFT (file a).
         """
         file = col
         rank = 7 - row
@@ -189,7 +189,7 @@ class QuantumBoard:
         Attempt a move (from,to) on the quantum state.
 
         Behavior:
-        - Uses Board.find_move() per-branch (promotion defaults to queen for backrank pawn moves) :contentReference[oaicite:7]{index=7}
+        - Uses Board.find_move() per-branch (promotion defaults to queen for backrank pawn moves)
         - If move is legal in some branches and illegal in others:
             - If illegality is because target square has own piece => exclusion measurement/collapse.
             - Otherwise: controlled move => legal branches push(move), illegal branches push(null).

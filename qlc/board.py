@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple, Dict
 
 import chess  # python-chess
-
 from .piece import Piece
 
 RC = Tuple[int, int]
@@ -29,18 +28,17 @@ class _Branch:
 def rc_to_square(r: int, c: int) -> chess.Square:
     """
     Convert internal (r,c) with r=0 at top (rank 8) into python-chess square index.
-    python-chess: square(file_index, rank_index) where rank_index=0 is rank 1. :contentReference[oaicite:0]{index=0}
+    python-chess: square(file_index, rank_index) where rank_index=0 is rank 1.
     """
-    return chess.square(c, 7 - r)  # :contentReference[oaicite:1]{index=1}
-
+    return chess.square(c, 7 - r)
 
 def square_to_rc(sq: chess.Square) -> RC:
     """
     Convert python-chess square index into internal (r,c) with r=0 at top (rank 8).
-    Uses square_file/square_rank. :contentReference[oaicite:2]{index=2}
+    Uses square_file/square_rank.
     """
-    file_idx = chess.square_file(sq)  # :contentReference[oaicite:3]{index=3}
-    rank_idx = chess.square_rank(sq)  # :contentReference[oaicite:4]{index=4}
+    file_idx = chess.square_file(sq)
+    rank_idx = chess.square_rank(sq)
     return (7 - rank_idx, file_idx)
 
 
@@ -64,14 +62,14 @@ class Board:
 
     @property
     def turn_color(self) -> str:
-        # python-chess: chess.WHITE True, chess.BLACK False. :contentReference[oaicite:5]{index=5}
-        return "w" if self._root().turn == chess.WHITE else "b"  # :contentReference[oaicite:6]{index=6}
+        # python-chess: chess.WHITE True, chess.BLACK False
+        return "w" if self._root().turn == chess.WHITE else "b"
 
     def is_game_over(self) -> bool:
-        return self._root().is_game_over()  # :contentReference[oaicite:7]{index=7}
+        return self._root().is_game_over()
 
     def result(self) -> str:
-        return self._root().result()  # :contentReference[oaicite:8]{index=8}
+        return self._root().result()
 
     def _root(self) -> chess.Board:
         return max(self.branches, key=lambda b: b.weight).board
@@ -79,7 +77,7 @@ class Board:
     def _normalize(self) -> None:
         total = sum(b.weight for b in self.branches)
         if total <= 0:
-            self.branches = [_Branch(self._root().copy(stack=True), 1.0)]  # :contentReference[oaicite:9]{index=9}
+            self.branches = [_Branch(self._root().copy(stack=True), 1.0)] 
             return
         for b in self.branches:
             b.weight /= total
@@ -89,12 +87,12 @@ class Board:
         Return piece "paling mungkin" di (r,c) dengan prob = total weight cabang
         yang punya piece type+color itu di square tsb.
 
-        piece_at() dari python-chess. :contentReference[oaicite:10]{index=10}
+        piece_at() dari python-chess
         """
         sq = rc_to_square(r, c)
         dist: Dict[Tuple[str, str], float] = {}
         for br in self.branches:
-            p = br.board.piece_at(sq)  # :contentReference[oaicite:11]{index=11}
+            p = br.board.piece_at(sq) 
             if p is None:
                 continue
             color = "w" if p.color == chess.WHITE else "b"
@@ -110,12 +108,12 @@ class Board:
     def apply_move(self, start: RC, end: RC) -> str:
         """
         Apply move normal. Legalitas move, check-rule, castling, en passant, dll,
-        ditangani python-chess via find_move() + push(). :contentReference[oaicite:12]{index=12}
+        ditangani python-chess via find_move() + push().
 
         Quantum-lite:
           - kalau legal hanya di sebagian cabang -> collapse ke cabang legal.
           - kalau capture di sebagian cabang dan non-capture di cabang lain -> sampling
-            sukses capture berdasarkan massa probabilitas cabang capture (is_capture). :contentReference[oaicite:13]{index=13}
+            sukses capture berdasarkan massa probabilitas cabang capture (is_capture).
         """
         from_sq = rc_to_square(*start)
         to_sq = rc_to_square(*end)
@@ -124,7 +122,7 @@ class Board:
         for br in self.branches:
             b = br.board
             try:
-                mv = b.find_move(from_sq, to_sq)  # :contentReference[oaicite:14]{index=14}
+                mv = b.find_move(from_sq, to_sq)
             except Exception:
                 continue
 
@@ -139,7 +137,7 @@ class Board:
         cap: List[Tuple[_Branch, chess.Move]] = []
         ncap: List[Tuple[_Branch, chess.Move]] = []
         for br, mv in legal:
-            if br.board.is_capture(mv):  # :contentReference[oaicite:15]{index=15}
+            if br.board.is_capture(mv):
                 cap.append((br, mv))
             else:
                 ncap.append((br, mv))
@@ -157,14 +155,14 @@ class Board:
 
         new_branches: List[_Branch] = []
         for br, mv in chosen:
-            b2 = br.board.copy(stack=True)  # :contentReference[oaicite:16]{index=16}
-            b2.push(mv)  # :contentReference[oaicite:17]{index=17}
+            b2 = br.board.copy(stack=True) 
+            b2.push(mv)  
             new_branches.append(_Branch(b2, br.weight))
 
         self.branches = new_branches
         self._normalize()
 
-        self.move_log.append(f"{chess.square_name(from_sq)}->{chess.square_name(to_sq)}")  # :contentReference[oaicite:18]{index=18}
+        self.move_log.append(f"{chess.square_name(from_sq)}->{chess.square_name(to_sq)}")  
         return "ok"
 
     def split_piece(self, start: RC, t1: RC, t2: RC) -> bool:
@@ -179,8 +177,8 @@ class Board:
         for br in self.branches:
             b = br.board
             try:
-                mv1 = b.find_move(from_sq, to1)  # :contentReference[oaicite:19]{index=19}
-                mv2 = b.find_move(from_sq, to2)  # :contentReference[oaicite:20]{index=20}
+                mv1 = b.find_move(from_sq, to1)  
+                mv2 = b.find_move(from_sq, to2)  
             except Exception:
                 continue
 
@@ -188,11 +186,11 @@ class Board:
             if piece is None or piece.color != b.turn:
                 continue
 
-            if b.is_capture(mv1) or b.is_capture(mv2):  # :contentReference[oaicite:21]{index=21}
+            if b.is_capture(mv1) or b.is_capture(mv2):  
                 continue
 
-            b1 = b.copy(stack=True); b1.push(mv1)  # :contentReference[oaicite:22]{index=22}
-            b2 = b.copy(stack=True); b2.push(mv2)  # :contentReference[oaicite:23]{index=23}
+            b1 = b.copy(stack=True); b1.push(mv1)  
+            b2 = b.copy(stack=True); b2.push(mv2)  
 
             new_branches.append(_Branch(b1, br.weight * 0.5))
             new_branches.append(_Branch(b2, br.weight * 0.5))
@@ -204,5 +202,5 @@ class Board:
         self._normalize()
         self.move_log.append(
             f"SPLIT {chess.square_name(from_sq)}->{chess.square_name(to1)} | {chess.square_name(to2)}"
-        )  # :contentReference[oaicite:24]{index=24}
+        )  
         return True

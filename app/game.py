@@ -79,7 +79,7 @@ class QuantumBoardAdapter:
 
         for br in self.qb.branches:
             b = br.board
-            p = b.piece_at(from_sq)  # piece_at()
+            p = b.piece_at(from_sq)
             if p is None or p.color != b.turn:
                 continue
 
@@ -128,7 +128,7 @@ class QuantumBoardAdapter:
         if white_king_prob <= 0 and black_king_prob > 0:
             return "0-1" # Black wins (Raja putih tewas)
         if black_king_prob <= 0 and white_king_prob > 0:
-            return "1-0" # Putih enang (Raja hitam tewas)
+            return "1-0" # White wins (Raja hitam tewas)
         if white_king_prob <= 0 and black_king_prob <= 0:
             return "1/2-1/2" # Draw (Keduanya tewas)
 
@@ -136,7 +136,7 @@ class QuantumBoardAdapter:
         return self.qb.most_likely_board().result()
     
     def _get_king_probability(self, color):
-        """Helper untuk menghitung total probabilitas Raja warna tertentu."""
+        """Helper untuk menghitung total probabilitas raja warna tertentu."""
         total_prob = 0.0
         for br in self.qb.branches:
             # Hitung probabilitas branch
@@ -167,7 +167,6 @@ class Game:
         self.game_over = False
 
     def start(self):
-        # --- LOOP APLIKASI (OUTER LOOP) ---
         while True:
             self._reset_game_state()
             self._choose_side_menu()
@@ -378,7 +377,7 @@ class Game:
             )
              
             pygame.display.flip()
-            # pygame.time.delay(250) # Kurangi delay biar gak terasa lag
+            # pygame.time.delay(250) # Kurangi delay biar ga lag
 
             self.bot.make_move(self.board)
 
