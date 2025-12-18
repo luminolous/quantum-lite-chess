@@ -1,6 +1,6 @@
 # ai/bot.py
 import random
-import chess  # python-chess
+import chess
 
 from qlc.rules import Rules
 from qlc.board import rc_to_square

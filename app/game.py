@@ -9,6 +9,115 @@ from qlc.rules import Rules
 from render.renderer import Renderer
 from ai.bot import Bot
 
+import chess
+from quantum.quantum_board import QuantumBoard
+
+class UIPiece:
+    """
+    Piece versi UI biar Renderer & Game lama tetap jalan.
+    - symbol: 'P','p','K','k', dll (format python-chess)
+    - prob: probabilitas piece paling dominan di square itu
+    """
+    def __init__(self, symbol: str, prob: float):
+        self.symbol = symbol
+        self.prob = prob
+
+    @property
+    def color(self) -> str:
+        return "w" if self.symbol.isupper() else "b"
+
+    @property
+    def kind(self) -> str:
+        return self.symbol.upper()  # 'p' -> 'P'
+
+    @property
+    def code(self) -> str:
+        # Sesuaikan kalau Asset sprite kamu pakai key berbeda
+        return f"{self.color}{self.kind}"
+
+
+class QuantumBoardAdapter:
+    """
+    Membuat QuantumBoard "terlihat" seperti Board lama.
+    Minimal change di game.py + renderer + bot.
+    """
+    def __init__(self, *, seed: int = 123, max_branches: int = 64):
+        self.qb = QuantumBoard(seed=seed, max_branches=max_branches)
+        self.move_log = []
+
+    @property
+    def turn_color(self) -> str:
+        # chess.WHITE == True, chess.BLACK == False :contentReference[oaicite:0]{index=0}
+        return "w" if self.qb.turn() == chess.WHITE else "b"
+
+    @property
+    def branches(self):
+        # supaya kalau ada code lain yg iterasi branch
+        return self.qb.branches
+
+    def get_piece(self, r: int, c: int):
+        sq = QuantumBoard.rc_to_square(r, c)
+        dist = self.qb.square_distribution(sq)
+
+        best_sym = None
+        best_p = 0.0
+        for sym, p in dist.items():
+            if sym is None:
+                continue
+            if p > best_p:
+                best_sym, best_p = sym, p
+
+        if best_sym is None or best_p <= 0.0:
+            return None
+        return UIPiece(best_sym, best_p)
+
+    def get_valid_moves(self, r: int, c: int):
+        """
+        Union legal-moves dari semua branch untuk piece di (r,c).
+        python-chess punya board.legal_moves sebagai generator move legal. :contentReference[oaicite:1]{index=1}
+        """
+        from_sq = QuantumBoard.rc_to_square(r, c)
+        out = set()
+
+        for br in self.qb.branches:
+            b = br.board
+            p = b.piece_at(from_sq)  # piece_at() :contentReference[oaicite:2]{index=2}
+            if p is None or p.color != b.turn:
+                continue
+
+            for mv in b.legal_moves:
+                if mv.from_square == from_sq:
+                    rr, cc = QuantumBoard.square_to_rc(mv.to_square)
+                    out.add((rr, cc))
+
+        return list(out)
+
+    def apply_move(self, start_rc, end_rc):
+        from_sq = QuantumBoard.rc_to_square(*start_rc)
+        to_sq = QuantumBoard.rc_to_square(*end_rc)
+
+        ok = self.qb.apply_move(from_sq, to_sq)
+        if ok:
+            self.move_log.append(f"MOVE {start_rc} -> {end_rc}")
+            return "ok"
+        return "illegal"
+
+    def split_piece(self, start_rc, a_rc, b_rc):
+        from_sq = QuantumBoard.rc_to_square(*start_rc)
+        to_a = QuantumBoard.rc_to_square(*a_rc)
+        to_b = QuantumBoard.rc_to_square(*b_rc)
+
+        ok = self.qb.apply_split(from_sq, to_a, to_b)
+        if ok:
+            self.move_log.append(f"SPLIT {start_rc} -> {a_rc} | {b_rc}")
+        return ok
+
+    def is_game_over(self):
+        # gunakan branch paling mungkin untuk status game over
+        return self.qb.most_likely_board().is_game_over()  # :contentReference[oaicite:3]{index=3}
+
+    def result(self):
+        return self.qb.most_likely_board().result()  # :contentReference[oaicite:4]{index=4}
 
 class Game:
     def __init__(self):
@@ -20,7 +129,7 @@ class Game:
         self.assets.load_all()
 
         self.renderer = Renderer(self.screen, self.assets)
-        self.board = Board()
+        self.board = QuantumBoardAdapter(seed=123, max_branches=64)
         self.selected = None
         self.valid_moves = []
         self.player_color = 'w'
@@ -148,7 +257,7 @@ class Game:
         # select piece
         if piece and piece.color == self.player_color:
             self.selected = (r, c)
-            self.valid_moves = Rules.get_valid_moves(self.board, r, c)
+            self.valid_moves = self.board.get_valid_moves(r, c)
             self.split_target1 = None
 
     def _bot_turn(self):
