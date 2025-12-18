@@ -1,11 +1,9 @@
-# qlc/rules.py
 """
 Move generation using python-chess.
 Return format tetap: list of (r,c) tujuan.
 """
 from __future__ import annotations
 from .board import rc_to_square, square_to_rc
-
 
 class Rules:
     @staticmethod

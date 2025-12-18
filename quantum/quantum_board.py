@@ -1,20 +1,16 @@
-# quantum/quantum_board.py
 from __future__ import annotations
-
 from dataclasses import dataclass
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Iterable
 import math
 import random
 
-import chess  # python-chess
-
+import chess
 
 @dataclass
 class Branch:
     board: chess.Board
-    amp: complex  # amplitude (complex). Probability = |amp|^2
-
+    amp: complex
 
 class QuantumBoard:
     """
@@ -25,7 +21,6 @@ class QuantumBoard:
     - Captures + "exclusion" (trying to move onto your own piece in some branches) => measurement (collapse).
     - Blocked-by-uncertainty (slide move) => controlled move: branch where legal moves, branch where illegal does null-move.
     """
-
     def __init__(
         self,
         fen: Optional[str] = None,

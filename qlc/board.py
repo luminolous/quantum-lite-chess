@@ -1,4 +1,3 @@
-# qlc/board.py
 """
 Board state backed by python-chess.
 
@@ -13,11 +12,10 @@ import random
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Dict
 
-import chess  # python-chess
+import chess
 from .piece import Piece
 
 RC = Tuple[int, int]
-
 
 @dataclass
 class _Branch:
