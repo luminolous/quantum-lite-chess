@@ -5,7 +5,6 @@ import chess
 from qlc.rules import Rules
 from qlc.board import rc_to_square
 
-
 class Bot:
     def __init__(self, color='b', seed=None):
         self.color = color  # 'w' or 'b'
