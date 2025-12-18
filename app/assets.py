@@ -30,7 +30,7 @@ class AssetManager:
 
     def _load_images(self):
         # Load bg
-        bg_path = os.path.join(Config.ASSETS_PATH, "bg.jpg")
+        bg_path = os.path.join(Config.ASSETS_PATH, "bg.png")
         if os.path.exists(bg_path):
             img = pygame.image.load(bg_path)
             self.background = pygame.transform.scale(img, (Config.WIDTH, Config.HEIGHT))

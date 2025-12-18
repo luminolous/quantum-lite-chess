@@ -167,17 +167,35 @@ class Game:
         self.game_over = False
 
     def start(self):
-        self._choose_side_menu()
-
-        # White always first. kalo player pilih black, bot (white) move dulu.
-        if self.player_color == "b":
-            self._bot_turn()
-
-        clock = pygame.time.Clock()
-
+        # --- LOOP APLIKASI (OUTER LOOP) ---
         while True:
+            self._reset_game_state()
+            self._choose_side_menu()
+
+            # White always first
+            if self.player_color == "b":
+                self._bot_turn()
+
+            self._game_loop()
+            
+    def _reset_game_state(self):
+        """Mengembalikan game ke kondisi awal yang bersih."""
+        self.board = QuantumBoardAdapter(seed=None, max_branches=64)
+        self.selected = None
+        self.valid_moves = []
+        self.split_target1 = None
+        self.game_over = False
+        self.quantum_mode = False
+
+    def _game_loop(self):
+        """Loop game inti"""
+        clock = pygame.time.Clock()
+        running = True
+
+        while running:
             clock.tick(30)
 
+            # Render game
             current_result = None
             if hasattr(self.board, "result"):
                 current_result = self.board.result()
@@ -189,43 +207,62 @@ class Game:
                 quantum_mode=self.quantum_mode,
                 split_target1=self.split_target1,
                 player_color=self.player_color,
-                game_over=self.game_over, 
+                game_over=self.game_over,
                 result_str=current_result
             )
 
+            # Event handling
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit(); sys.exit()
-                
-                # Esc untuk keluar saat game over
+
+                # Esc balik ke menu
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
-                        pygame.quit(); sys.exit()
-
-                    if not self.game_over: # Kunci input lain kalo udah game over
-                        if event.key == pygame.K_q:
-                            self.quantum_mode = not self.quantum_mode
-                            self.split_target1 = None
+                        if self.game_over:
+                            running = False
+                        else:
+                            # Kalo belom game over, ESC batal
                             self.selected = None
                             self.valid_moves = []
+                            self.split_target1 = None
+                    
+                    # Toggle quantum mode (Q)
+                    if not self.game_over and event.key == pygame.K_q:
+                        self.quantum_mode = not self.quantum_mode
+                        self.split_target1 = None
+                        self.selected = None
+                        self.valid_moves = []
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    # Cegah klik kalau udah game over
                     if not self.game_over:
                         self._handle_click(pygame.mouse.get_pos())
 
     def _choose_side_menu(self):
+        title_font = self.assets.fonts['title']
+        instr_font = self.assets.fonts['default'] 
+
         while True:
-            # self.screen.fill((0, 0, 0))
+            # Background
             self.screen.blit(self.assets.background, (0, 0))
+            
+            # Dark overlay
             overlay = pygame.Surface((Config.WIDTH, Config.HEIGHT), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 100)) # Hitam transparan
+            overlay.fill((0, 0, 0, 100)) 
             self.screen.blit(overlay, (0, 0))
 
-            text = self.assets.fonts['title'].render("Press W or B to choose side", True, (255, 255, 255))
-            self.screen.blit(text, (80, Config.HEIGHT // 2 - 50))
+            title_text = title_font.render("Quantum Chess", True, (255, 255, 255))
+            instr_text = instr_font.render("Press W or B to choose side", True, (200, 200, 200))
+
+            title_rect = title_text.get_rect(center=(Config.WIDTH // 2, Config.HEIGHT // 2 - 80))
+            instr_rect = instr_text.get_rect(center=(Config.WIDTH // 2, Config.HEIGHT // 2 + 20))
+
+            self.screen.blit(title_text, title_rect)
+            self.screen.blit(instr_text, instr_rect)
+
             pygame.display.update()
 
+            # Event Loop
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit(); sys.exit()

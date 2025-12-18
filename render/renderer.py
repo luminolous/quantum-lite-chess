@@ -108,12 +108,12 @@ class Renderer:
         self.screen.blit(sub_surf, (cx - sub_surf.get_width() // 2, cy - 20))
         
         # Instruksi keluar
-        hint = sub_font.render("Press ESC to Quit", True, (150, 150, 150))
+        hint = sub_font.render("Press ESC to Main Menu", True, (150, 150, 150))
         self.screen.blit(hint, (cx - hint.get_width() // 2, cy + 60))
 
     def _draw_hud(self, board_obj, *, quantum_mode: bool, selected, split_target1, player_color: str, thinking: bool):
         """Panel instruksi kecil biar user paham kontrol split."""
-        font = self.assets.fonts.get("small") or self.assets.fonts["default"]
+        hud_font = pygame.font.SysFont(Config.FONT_MAIN, 14)
 
         # Deteksi giliran player (QuantumBoardAdapter punya turn_color)
         turn_color = getattr(board_obj, "turn_color", None)
@@ -148,11 +148,12 @@ class Renderer:
         w = 0
         h = 0
         rendered = []
+
         for t in lines:
-            surf = font.render(t, True, (255, 255, 255))
+            surf = hud_font.render(t, True, (255, 255, 255))
             rendered.append(surf)
             w = max(w, surf.get_width())
-            h += surf.get_height() + 4
+            h += surf.get_height() + 2
         w += pad * 2
         h += pad * 2
 
@@ -164,7 +165,7 @@ class Renderer:
         y = 20 + pad
         for surf in rendered:
             self.screen.blit(surf, (20 + pad, y))
-            y += surf.get_height() + 4
+            y += surf.get_height() + 2
 
     def _draw_square_label(self, r, c, text: str, player_color="w"):
         """Label kecil di atas kotak (misal 'A' untuk split_target1)."""
@@ -230,10 +231,19 @@ class Renderer:
             pygame.draw.rect(self.screen, color, rect, width)
 
     def _draw_move_log(self, log):
-        pygame.draw.rect(self.screen, (30, 30, 30), (Config.WIDTH - 200, 50, 180, 140))
-        font = self.assets.fonts.get("small") or self.assets.fonts["default"]
-        title = font.render("Log", True, (255, 255, 255))
-        self.screen.blit(title, (Config.WIDTH - 190, 55))
-        for i, txt in enumerate(log[-4:]):
-            surf = font.render(str(txt), True, (200, 200, 200))
-            self.screen.blit(surf, (Config.WIDTH - 190, 80 + i * 25))
+        panel_width = 230  
+        panel_height = 150
+        x_start = Config.WIDTH - panel_width - 10  
+        y_start = 50
+
+        pygame.draw.rect(self.screen, (30, 30, 30), (x_start, y_start, panel_width, panel_height))
+        
+        log_font = pygame.font.SysFont(Config.FONT_MAIN, 14) 
+        
+        title = log_font.render("Log Move", True, (255, 255, 255))
+        self.screen.blit(title, (x_start + 10, y_start + 5))
+
+        # Isi log (last 6 move)
+        for i, txt in enumerate(log[-6:]): 
+            surf = log_font.render(str(txt), True, (200, 200, 200))            
+            self.screen.blit(surf, (x_start + 10, y_start + 25 + i * 20))
