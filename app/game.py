@@ -156,6 +156,7 @@ class Game:
                 selected=self.selected,
                 valid_moves=self.valid_moves,
                 quantum_mode=self.quantum_mode,
+                split_target1=self.split_target1,
                 player_color=self.player_color
             )
 
@@ -262,7 +263,16 @@ class Game:
 
     def _bot_turn(self):
         while not self.game_over and self.bot and getattr(self.board, "turn_color", None) != self.player_color:
-            self.renderer.draw_game(self.board, thinking=True, player_color=self.player_color)
+            self.renderer.draw_game(
+                self.board,
+                selected=self.selected,
+                valid_moves=self.valid_moves,
+                quantum_mode=self.quantum_mode,
+                split_target1=self.split_target1,
+                thinking=True,
+                player_color=self.player_color,
+            )
+             
             pygame.display.flip()
             pygame.time.delay(250)
 

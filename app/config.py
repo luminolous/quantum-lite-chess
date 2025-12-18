@@ -21,5 +21,8 @@ class Config:
     COLOR_VALID_MOVE = (144, 238, 144)
     COLOR_SELECTED = (255, 0, 0)
     
+    # Quantum UI: kotak target A (split_target1)
+    COLOR_SPLIT_ANCHOR = (0, 200, 255)
+    
     # Fonts
     FONT_MAIN = "DejaVu Sans"

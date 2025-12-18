@@ -13,6 +13,7 @@ class Renderer:
         selected=None,
         valid_moves=None,
         quantum_mode=False,
+        split_target1=None,
         player_color="w",
         thinking=False,
     ):
@@ -31,12 +32,30 @@ class Renderer:
             color = Config.COLOR_HIGHLIGHT if quantum_mode else Config.COLOR_VALID_MOVE
             self._draw_rect(r, c, color, alpha=100, player_color=player_color)
 
+        # Highlight split target A (split_target1)
+        if split_target1 is not None:
+            r, c = split_target1
+            # Outline + soft fill biar kelihatan jelas
+            self._draw_rect(r, c, Config.COLOR_SPLIT_ANCHOR, alpha=60, player_color=player_color)
+            self._draw_rect(r, c, Config.COLOR_SPLIT_ANCHOR, width=6, player_color=player_color)
+            self._draw_square_label(r, c, "A", player_color=player_color)
+
         # Highlight selected square
         if selected:
             self._draw_rect(selected[0], selected[1], Config.COLOR_SELECTED, width=4, player_color=player_color)
 
         # Draw pieces
         self._draw_pieces(board_obj, x_off, y_off, player_color=player_color)
+
+        # HUD / instructions
+        self._draw_hud(
+            board_obj,
+            quantum_mode=quantum_mode,
+            selected=selected,
+            split_target1=split_target1,
+            player_color=player_color,
+            thinking=thinking,
+        )
 
         # Move log (kalau ada)
         if hasattr(board_obj, "move_log"):
@@ -49,6 +68,78 @@ class Renderer:
             self.screen.blit(txt, (Config.WIDTH - 250, 20))
 
         pygame.display.update()
+
+    def _draw_hud(self, board_obj, *, quantum_mode: bool, selected, split_target1, player_color: str, thinking: bool):
+        """Panel instruksi kecil biar user paham kontrol split."""
+        font = self.assets.fonts.get("small") or self.assets.fonts["default"]
+
+        # Deteksi giliran player (QuantumBoardAdapter punya turn_color)
+        turn_color = getattr(board_obj, "turn_color", None)
+        is_player_turn = (turn_color == player_color) if turn_color is not None else True
+
+        lines = []
+        if not quantum_mode:
+            lines.append("Q: Quantum OFF (press Q to toggle)")
+            if is_player_turn:
+                lines.append("Click a piece, then click a target square")
+        else:
+            lines.append("Quantum ON (press Q to exit)")
+            if thinking or (not is_player_turn):
+                lines.append("Waiting for computer…")
+            else:
+                if selected is None:
+                    lines.append("1) Click your piece to select")
+                    lines.append("2) Normal move: click a highlighted square")
+                    lines.append("3) Split: hold SHIFT + click target A, then click target B")
+                else:
+                    if split_target1 is None:
+                        lines.append("Normal move: click a highlighted square")
+                        lines.append("Split: hold SHIFT + click an EMPTY highlighted square to set target A")
+                    else:
+                        lines.append("Split target A selected (cyan). Now click target B")
+                        lines.append("Tip: click elsewhere to cancel A")
+
+        if not lines:
+            return
+
+        pad = 10
+        w = 0
+        h = 0
+        rendered = []
+        for t in lines:
+            surf = font.render(t, True, (255, 255, 255))
+            rendered.append(surf)
+            w = max(w, surf.get_width())
+            h += surf.get_height() + 4
+        w += pad * 2
+        h += pad * 2
+
+        # Panel background transparan (alpha blending pakai Surface SRCALPHA) :contentReference[oaicite:0]{index=0}
+        panel = pygame.Surface((w, h), pygame.SRCALPHA)
+        panel.fill((0, 0, 0, 170))
+        self.screen.blit(panel, (20, 20))
+
+        y = 20 + pad
+        for surf in rendered:
+            self.screen.blit(surf, (20 + pad, y))
+            y += surf.get_height() + 4
+
+    def _draw_square_label(self, r, c, text: str, player_color="w"):
+        """Label kecil di atas kotak (misalnya 'A' untuk split_target1)."""
+        font = self.assets.fonts.get("split") or self.assets.fonts.get("small") or self.assets.fonts["default"]
+
+        x_off = (Config.WIDTH - Config.BOARD_SIZE) // 2
+        y_off = (Config.HEIGHT - Config.BOARD_SIZE) // 2
+        draw_r = 7 - r if player_color == "b" else r
+        draw_c = 7 - c if player_color == "b" else c
+        x = x_off + draw_c * Config.SQUARE_SIZE
+        y = y_off + draw_r * Config.SQUARE_SIZE
+
+        surf = font.render(text, True, (0, 0, 0))
+        bg = pygame.Surface((surf.get_width() + 8, surf.get_height() + 4), pygame.SRCALPHA)
+        bg.fill((255, 255, 255, 200))
+        self.screen.blit(bg, (x + 6, y + 6))
+        self.screen.blit(surf, (x + 10, y + 8))
 
     def _draw_pieces(self, board_obj, x_off, y_off, player_color="w"):
         font = self.assets.fonts.get("small") or self.assets.fonts["default"]
