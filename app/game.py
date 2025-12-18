@@ -32,7 +32,6 @@ class UIPiece:
 
     @property
     def code(self) -> str:
-        # Sesuaikan kalau Asset sprite kamu pakai key berbeda
         return f"{self.color}{self.kind}"
 
 
